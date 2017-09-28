@@ -61,7 +61,8 @@ int main(int argc, char * argv[]) {
 		send_success = sendto(server_fd, reply, strlen(reply), 0, (struct sockaddr *) &anyclient_addr, addrlen);
 	}
 	// printf("Send message\n");
-	
+
+
 	close(server_fd);
 	return 0;
 }	
