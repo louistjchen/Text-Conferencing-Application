@@ -129,8 +129,8 @@ int main(int argc, char * argv[]) {
     fclose(file_pointer);
 
     /* determine number of packets */
-    int last_packet_size = file_size % 1000;
-    int num_packets = (last_packet_size) ? ((file_size/1000) + 1) : (file_size/1000);
+    int last_packet_size = file_size % 999;
+    int num_packets = (last_packet_size) ? ((file_size/999) + 1) : (file_size/999);
 	/* initialize all outgoing packets */
     packet * outgoing_packet = (packet *)malloc(sizeof(packet) * num_packets);
     int i, packet_size;
@@ -138,8 +138,8 @@ int main(int argc, char * argv[]) {
         outgoing_packet[i].total_frag = num_packets;
         outgoing_packet[i].frag_no = i+1;
         /* to find size, use snprintf */
-        snprintf(outgoing_packet[i].filedata,1000,"%s",&filedata[i*1000]);
-        outgoing_packet[i].size = (i == num_packets-1) ? last_packet_size : 1000;
+        snprintf(outgoing_packet[i].filedata,1000,"%s",&filedata[i*999]);
+        outgoing_packet[i].size = (i == num_packets-1) ? (last_packet_size+1) : 1000;
         outgoing_packet[i].filename = transport_file_name;
     }
 

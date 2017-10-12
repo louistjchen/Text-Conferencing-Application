@@ -85,7 +85,7 @@ int main(int argc, char * argv[]) {
 	unsigned short port_number = 22000; /* default to 22000 */
 	int sock_fd = -1;
 	struct sockaddr_in server_addr_info, anyclient_addr_info;
-	unsigned int anyclient_len;
+	unsigned int anyclient_len = sizeof(anyclient_addr_info);
 
 	/* pre-processing */
 	bzero(&server_addr_info, sizeof(server_addr_info)); 
