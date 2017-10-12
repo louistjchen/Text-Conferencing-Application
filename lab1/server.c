@@ -16,6 +16,17 @@ typedef struct packet {
 } packet;
 /* DEFINE END - packet struct */
 
+/* FUNCTION BEGIN - copy string */
+int copy_string(char * dest, char * src, int size) {
+    int n;
+    for (n = 0; n < size - 1; n++) {
+        dest[n] = src[n];
+    }
+    dest[n] = '\0';
+    return n;
+}
+/* FUNCTION END - copy string */
+
 /* FUNCTION BEGIN - initialize + bind socket */
 int initialize_bind_socket(struct sockaddr_in * server_addr_info, unsigned short port_number) {
     
@@ -72,7 +83,6 @@ void decipher_packet(packet * incoming_ack, char * incoming_ack_str) {
     for (j = 0; j < incoming_ack->size; j++) {
         incoming_ack->filedata[j] = incoming_ack_str[i+j];
     }
-    printf("File name:%s string:%s\n",incoming_ack->filename,incoming_ack->filedata);
     return;
 }
 /* FUNCTION END - decipher packet */
@@ -100,6 +110,7 @@ int main(int argc, char * argv[]) {
     /* section 3 - BEGIN */	
 	unsigned int curr = 0; /* data structure to track the next fragment number to receive */
     unsigned int num_packets = 100000000; /* initialize to arbitrarily high number */
+    unsigned int last_packet_size = 1000; /* initialize to 1000 */
     char incoming_packet_str[1100]; /* string to capture incoming packets */
     char outgoing_ack_str[1000]; /* string to capture outgoing acks */
     packet incoming_packet;
@@ -120,7 +131,12 @@ int main(int argc, char * argv[]) {
                 file_data = (char **)malloc( sizeof(char *) * incoming_packet.total_frag );
             }
             file_data[curr] = (char *)malloc( sizeof(char) * incoming_packet.size );
-            sprintf(file_data[curr], incoming_packet.filedata);
+            /* if receiving packet for the last time, must update last_packet_size */
+            if (curr == num_packets-1) {
+                last_packet_size = incoming_packet.size;
+                printf("Last packet size %u\n", last_packet_size);
+            }
+            copy_string(file_data[curr],incoming_packet.filedata,incoming_packet.size);
             /* incoming packet is the one server is waiting for */
             if (incoming_packet.frag_no == curr + 1) {
                 /* send ack in filedata */
@@ -133,22 +149,37 @@ int main(int argc, char * argv[]) {
             sprintf(outgoing_ack_str,"0:%u:5:nofile:noack\0",curr+1);
         }
         /* send ack/nack */
+        printf("Send ack\n");
         sendto(sock_fd,outgoing_ack_str,sizeof(outgoing_ack_str),0,(struct sockaddr *) &anyclient_addr_info,anyclient_len);
-        printf("Sent ack to client\n");
     }
     /* section 3 - END */
+
+    int l=0;
+    printf("\naaaaaaaaaaaaaaaaaaaaaaaaaaaa-------------------------\n");
+    for(; l<1000; l++)
+        printf("%c", file_data[0][l]);
+    printf("\nzzzzzzzzzzzzzzzzzzzzzzzzzzzz-------------------------\n");
 
 	/* close socket */
     close(sock_fd);
     /* write filedata to file stream */
     FILE * file_pointer = fopen("output.txt", "w");
-    int i;
+    int i, packet_size;
     for(i = 0; i < num_packets; i++) {
-        fputs(file_data[i], file_pointer);
-        free(file_data[i]);
+        packet_size = 1000;
+        if (i == num_packets-1) { 
+            packet_size = last_packet_size;
+        }
+        int j;
+        for (j = 0; j < packet_size-1; j++) {
+            printf("%c",file_data[i][j]);
+            fwrite(&file_data[i][j],1,sizeof(char),file_pointer);
+        }
+        printf("-----%u-----------------------------LALALALALALALALALALALA\n", i);
+        // free(file_data[i]);
     }
-    free(file_data);
-    free(incoming_packet.filename);
+    // free(file_data);
+    // free(incoming_packet.filename);
     fclose(file_pointer);
 
 

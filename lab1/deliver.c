@@ -20,17 +20,29 @@ typedef struct packet {
 } packet;
 /* DEFINE END - struct packet */
 
-/* FVUNCTION BEGIN - copy string */
+/* FUNCTION BEGIN - copy string */
 int copy_string(char * dest, char * src, int size) { 
     int n;
     for (n = 0; n < size - 1; n++) {
         dest[n] = src[n];
-        printf("%c",dest[n]);
     }
     dest[n] = '\0';
     return n;
 }
 /* FUNCTION END - copy string */
+
+/* FUNCTION BEGIN - format string */
+int format_string(char * dest, unsigned int total_frag, unsigned int frag_no, unsigned int size, char * filename, char * filedata) {
+    sprintf(dest,"%u:%u:%u:%s:", total_frag, frag_no, size, filename);
+    int len = strlen(dest);
+    int n;
+    for (n = len; n < len + size; n++) {
+        dest[n] = filedata[n-len];
+    }
+    dest[n] = '\0';
+    return len + size;
+}
+/* FUNCTION END - format string */
 
 /* FUNCTION BEGIN - initialize socket */
 int initialize_socket(struct sockaddr_in * server_addr_info, char * server_ip_addr, unsigned short port_number) {
@@ -169,7 +181,7 @@ int main(int argc, char * argv[]) {
     while (curr < num_packets) {
         /* initialize outgoing packet str */
         bzero(outgoing_packet_str,sizeof(outgoing_packet_str));
-        sprintf(outgoing_packet_str,"%u:%u:%u:%s:%s",outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
+        format_string(outgoing_packet_str,outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
         /* reset incoming ack str*/
         bzero(incoming_ack_str,sizeof(incoming_ack_str));
         /* initialize ack boolean flag to false */
@@ -177,7 +189,7 @@ int main(int argc, char * argv[]) {
         do {
             /* send the packet once */
             // gettimeofday(&start, NULL); /* start time */
-            printf("Send packet %s \n",outgoing_packet_str);
+            printf("Send packet\n");
             sendto(sock_fd,outgoing_packet_str,sizeof(outgoing_packet_str),0,(struct sockaddr *) &server_addr_info,server_len);
             /* check for incoming ack/nack */
             printf("Wait on ack \n");
@@ -187,7 +199,7 @@ int main(int argc, char * argv[]) {
                 printf("Received ack from server\n");
                 /* decipher packet */
                 decipher_packet(&incoming_ack,incoming_ack_str);
-                printf("total frag:%u frag no:%u size:%u filename:%s filedata:%s\n",incoming_ack.total_frag,incoming_ack.frag_no, incoming_ack.size, incoming_ack.filename, incoming_ack.filedata);
+                // printf("total frag:%u frag no:%u size:%u filename:%s filedata:%s\n",incoming_ack.total_frag,incoming_ack.frag_no, incoming_ack.size, incoming_ack.filename, incoming_ack.filedata);
                 if (incoming_ack.frag_no == curr + 1 && incoming_ack.size == 3) {
                     ack_flag = 1;
                     curr++;
