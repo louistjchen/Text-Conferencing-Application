@@ -10,7 +10,7 @@ CC := gcc
 RM := rm -f
 
 # flags
-#CFLAGS := -ggdb
+CFLAGS := -ggdb
 LDFLAGS :=
 LDLIBS :=
 
