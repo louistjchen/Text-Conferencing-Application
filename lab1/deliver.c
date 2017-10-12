@@ -188,7 +188,7 @@ int main(int argc, char * argv[]) {
         int ack_flag = 0;
         do {
             /* send the packet once */
-            // gettimeofday(&start, NULL); /* start time */
+            gettimeofday(&start, NULL); /* start time */
             printf("Send packet\n");
             sendto(sock_fd,outgoing_packet_str,sizeof(outgoing_packet_str),0,(struct sockaddr *) &server_addr_info,server_len);
             /* check for incoming ack/nack */
@@ -204,6 +204,7 @@ int main(int argc, char * argv[]) {
                     ack_flag = 1;
                     curr++;
                 }
+                printf("RTT (milliseconds): %f\n",(float)(stop.tv_usec - start.tv_usec)/1000);
             }
             /* reset incoming ack data structure before next iteration */
             bzero(&incoming_ack_str,sizeof(incoming_ack_str));
