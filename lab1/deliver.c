@@ -20,6 +20,18 @@ typedef struct packet {
 } packet;
 /* DEFINE END - struct packet */
 
+/* FVUNCTION BEGIN - copy string */
+int copy_string(char * dest, char * src, int size) { 
+    int n;
+    for (n = 0; n < size - 1; n++) {
+        dest[n] = src[n];
+        printf("%c",dest[n]);
+    }
+    dest[n] = '\0';
+    return n;
+}
+/* FUNCTION END - copy string */
+
 /* FUNCTION BEGIN - initialize socket */
 int initialize_socket(struct sockaddr_in * server_addr_info, char * server_ip_addr, unsigned short port_number) {
 
@@ -125,7 +137,13 @@ int main(int argc, char * argv[]) {
     /* dynamically allocate space for char array to load all the data into */
     char * filedata = malloc(sizeof(char) * (file_size + 1));
     /* load entire file into char array above */
-    fread(filedata, sizeof(char), file_size, file_pointer);
+    int n, count;
+    count = 0;
+    while (!feof(file_pointer)) {
+        n = fread(&filedata[count],sizeof(char),1,file_pointer);
+        count += n;
+    }
+    filedata[file_size] = '\0';
     fclose(file_pointer);
 
     /* determine number of packets */
@@ -137,9 +155,8 @@ int main(int argc, char * argv[]) {
     for (i = 0; i < num_packets; i++) {
         outgoing_packet[i].total_frag = num_packets;
         outgoing_packet[i].frag_no = i+1;
-        /* to find size, use snprintf */
-        snprintf(outgoing_packet[i].filedata,1000,"%s",&filedata[i*999]);
         outgoing_packet[i].size = (i == num_packets-1) ? (last_packet_size+1) : 1000;
+        copy_string(outgoing_packet[i].filedata,&filedata[i*999],outgoing_packet[i].size);    
         outgoing_packet[i].filename = transport_file_name;
     }
 
