@@ -130,6 +130,11 @@ int main(int argc, char * argv[]) {
                 strcpy(file_name, incoming_packet.filename);
                 file_data = (char **)malloc( sizeof(char *) * incoming_packet.total_frag );
             }
+	    	 
+	    // test timeout
+	    //char test;
+	    //scanf("%c", &test);
+
             file_data[curr] = (char *)malloc( sizeof(char) * incoming_packet.size );
             /* if receiving packet for the last time, must update last_packet_size */
             if (curr == num_packets-1) {
@@ -155,10 +160,8 @@ int main(int argc, char * argv[]) {
     /* section 3 - END */
 
     int l=0;
-    printf("\naaaaaaaaaaaaaaaaaaaaaaaaaaaa-------------------------\n");
     for(; l<1000; l++)
         printf("%c", file_data[0][l]);
-    printf("\nzzzzzzzzzzzzzzzzzzzzzzzzzzzz-------------------------\n");
 
 	/* close socket */
     close(sock_fd);
@@ -175,7 +178,6 @@ int main(int argc, char * argv[]) {
             printf("%c",file_data[i][j]);
             fwrite(&file_data[i][j],1,sizeof(char),file_pointer);
         }
-        printf("-----%u-----------------------------LALALALALALALALALALALA\n", i);
         // free(file_data[i]);
     }
     // free(file_data);

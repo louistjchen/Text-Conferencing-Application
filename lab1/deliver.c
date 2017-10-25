@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <math.h>
 
+// timeout 50us
+#define T1 50
+
 /* DEFINE BEGIN - struct packet */
 typedef struct packet {
     unsigned int total_frag;
@@ -194,8 +197,11 @@ int main(int argc, char * argv[]) {
             /* check for incoming ack/nack */
             printf("Wait on ack \n");
             int recv_success = recvfrom(sock_fd,incoming_ack_str,sizeof(incoming_ack_str),0,(struct sockaddr *) &server_addr_info,&server_len);
-            if (recv_success >= 0) {
-                gettimeofday(&stop, NULL); /* stop time */
+            gettimeofday(&stop, NULL); /* stop time */
+	    if((stop.tv_usec - start.tv_usec) > T1)
+		    printf("Acknowledgement wait time (%dus) exceeds defined timeout %dus. Resending packet\n", (stop.tv_usec - start.tv_usec), T1);
+            if (recv_success >= 0 && ((stop.tv_usec - start.tv_usec) <= T1)) {
+                //gettimeofday(&stop, NULL); /* stop time */
                 printf("Received ack from server\n");
                 /* decipher packet */
                 decipher_packet(&incoming_ack,incoming_ack_str);
