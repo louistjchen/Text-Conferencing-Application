@@ -11,7 +11,7 @@
 #include <math.h>
 
 // timeout 50us
-#define T1 50
+#define T1 200
 
 /* DEFINE BEGIN - struct packet */
 typedef struct packet {

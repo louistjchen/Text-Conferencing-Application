@@ -177,8 +177,6 @@ int main(int argc, char * argv[]) {
     for(; l<1000; l++)
         printf("%c", file_data[0][l]);
 
-	/* close socket */
-    close(sock_fd);
     /* write filedata to file stream */
     FILE * file_pointer = fopen("output.txt", "w");
     int i, packet_size;
@@ -197,6 +195,9 @@ int main(int argc, char * argv[]) {
     // free(file_data);
     // free(incoming_packet.filename);
     fclose(file_pointer);
+
+    // close socket
+    close(sock_fd);
 
 
 	return 0;
