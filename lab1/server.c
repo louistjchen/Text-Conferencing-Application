@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 /* DEFINE BEGIN - packet struct */
 typedef struct packet {
@@ -116,6 +117,10 @@ int main(int argc, char * argv[]) {
     packet incoming_packet;
     char file_name[1000];
     char **file_data = NULL;
+    
+    bool malloc2d = false;
+    bool *malloced = NULL;
+
     while (curr < num_packets) {
         /* reset incoming packet str */
 		bzero(incoming_packet_str, sizeof(incoming_packet_str));
@@ -125,17 +130,26 @@ int main(int argc, char * argv[]) {
             printf("Received packet %s\n",incoming_packet_str);
             decipher_packet(&incoming_packet,incoming_packet_str);
             /* if receiving packet for the first time, must update num_packets */
-            if (incoming_packet.frag_no == 1) { 
+            if (!malloc2d && incoming_packet.frag_no == 1) { 
                 num_packets = incoming_packet.total_frag;
                 strcpy(file_name, incoming_packet.filename);
                 file_data = (char **)malloc( sizeof(char *) * incoming_packet.total_frag );
+
+		malloced = (bool *)malloc( sizeof(bool)*incoming_packet.total_frag );
+		int x;
+		for(x = 0; x < incoming_packet.total_frag; x++)
+			malloced[x] = false;
+		malloc2d = true;
             }
 	    	 
 	    // test timeout
 	    //char test;
 	    //scanf("%c", &test);
 
-            file_data[curr] = (char *)malloc( sizeof(char) * incoming_packet.size );
+	    if(!malloced[curr]){
+	            file_data[curr] = (char *)malloc( sizeof(char) * incoming_packet.size );
+		    malloced[curr] = true;
+	    }
             /* if receiving packet for the last time, must update last_packet_size */
             if (curr == num_packets-1) {
                 last_packet_size = incoming_packet.size;
