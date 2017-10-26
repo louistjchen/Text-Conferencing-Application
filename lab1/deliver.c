@@ -11,7 +11,7 @@
 #include <math.h>
 
 // timeout 50us
-#define T1 200
+#define T1 15
 
 /* DEFINE BEGIN - struct packet */
 typedef struct packet {
@@ -23,6 +23,9 @@ typedef struct packet {
 } packet;
 /* DEFINE END - struct packet */
 
+
+
+
 /* FUNCTION BEGIN - copy string */
 int copy_string(char * dest, char * src, int size) { 
     int n;
@@ -33,6 +36,9 @@ int copy_string(char * dest, char * src, int size) {
     return n;
 }
 /* FUNCTION END - copy string */
+
+
+
 
 /* FUNCTION BEGIN - format string */
 int format_string(char * dest, unsigned int total_frag, unsigned int frag_no, unsigned int size, char * filename, char * filedata) {
@@ -47,11 +53,14 @@ int format_string(char * dest, unsigned int total_frag, unsigned int frag_no, un
 }
 /* FUNCTION END - format string */
 
+
+
+
 /* FUNCTION BEGIN - initialize socket */
 int initialize_socket(struct sockaddr_in * server_addr_info, char * server_ip_addr, unsigned short port_number) {
 
     /* build server's IP address */
-    server_addr_info->sin_family = AF_INET; /* for IPv4 */
+    server_addr_info->sin_family = AF_INET; 
     server_addr_info->sin_port = htons(port_number);
     
     inet_pton(AF_INET, server_ip_addr, (struct in_addr *) &(server_addr_info->sin_addr));
@@ -59,11 +68,14 @@ int initialize_socket(struct sockaddr_in * server_addr_info, char * server_ip_ad
     /* open a socket */
     int sock_fd = -1;
     while (sock_fd < 0) {
-        sock_fd = socket(AF_INET, SOCK_DGRAM, 0); /* domain, socket type, protocol */    
+        sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
     }
     return sock_fd;
 }
 /* FUNCTION END - initialize socket */
+
+
+
 
 /* FUNCTION BEGIN - decipher packet */
 void decipher_packet(packet * incoming_ack, char * incoming_ack_str) {
@@ -97,15 +109,16 @@ void decipher_packet(packet * incoming_ack, char * incoming_ack_str) {
     for (j = 0; j < incoming_ack->size; j++) {
         incoming_ack->filedata[j] = incoming_ack_str[i+j];
     }
-    printf("File name:%s string:%s\n",incoming_ack->filename,incoming_ack->filedata);
     return;
 }
 /* FUNCTION END - decipher packet */
 
+
+
+
 /* FUNCTION BEGIN - main */
 int main(int argc, char * argv[]) {
 	
-	/* section 1 - BEGIN */
     /* initialize address info variables */
 	unsigned short port_number = 22000; 
 	int sock_fd = -1;
@@ -140,9 +153,7 @@ int main(int argc, char * argv[]) {
 		printf("Entered file path is invalid. Please confirm and restart the program.\n");
 		return 0;
 	} 
-    /* section 1 - END */    
 
-    /* section 3 - BEGIN */
     /* determine file size (total # bytes) */
     struct stat st;
     unsigned int file_size = 0;
@@ -151,7 +162,6 @@ int main(int argc, char * argv[]) {
     }
     /* dynamically allocate space for char array to load all the data into */
     char * filedata = malloc(sizeof(char) * (file_size + 1));
-    /* load entire file into char array above */
     int n, count;
     count = 0;
     while (!feof(file_pointer)) {
@@ -184,10 +194,8 @@ int main(int argc, char * argv[]) {
     while (curr < num_packets) {
         /* initialize outgoing packet str */
         bzero(outgoing_packet_str,sizeof(outgoing_packet_str));
-        format_string(outgoing_packet_str,outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
-        /* reset incoming ack str*/
         bzero(incoming_ack_str,sizeof(incoming_ack_str));
-        /* initialize ack boolean flag to false */
+        format_string(outgoing_packet_str,outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
         int ack_flag = 0;
         do {
             /* send the packet once */
@@ -198,30 +206,19 @@ int main(int argc, char * argv[]) {
             printf("Wait on ack \n");
             int recv_success = recvfrom(sock_fd,incoming_ack_str,sizeof(incoming_ack_str),0,(struct sockaddr *) &server_addr_info,&server_len);
             gettimeofday(&stop, NULL); /* stop time */
-	    if((stop.tv_usec - start.tv_usec) > T1)
-		    printf("Acknowledgement wait time (%dus) exceeds defined timeout %dus. Resending packet\n", (stop.tv_usec - start.tv_usec), T1);
+	        if((stop.tv_usec - start.tv_usec) > T1)
+		        printf("Acknowledgement wait time (%dus) exceeds defined timeout %dus. Resending packet\n", (stop.tv_usec - start.tv_usec), T1);
             if (recv_success >= 0 && ((stop.tv_usec - start.tv_usec) <= T1)) {
-                //gettimeofday(&stop, NULL); /* stop time */
                 printf("Received ack from server\n");
-                /* decipher packet */
                 decipher_packet(&incoming_ack,incoming_ack_str);
-                // printf("total frag:%u frag no:%u size:%u filename:%s filedata:%s\n",incoming_ack.total_frag,incoming_ack.frag_no, incoming_ack.size, incoming_ack.filename, incoming_ack.filedata);
                 if (incoming_ack.frag_no == curr + 1 && incoming_ack.size == 3) {
                     ack_flag = 1;
                     curr++;
                 }
-                printf("RTT (milliseconds): %f\n",(float)(stop.tv_usec - start.tv_usec)/1000);
             }
-            /* reset incoming ack data structure before next iteration */
             bzero(&incoming_ack_str,sizeof(incoming_ack_str));
         } while (!ack_flag);        
     }
-
-
-    // struct timeval start, stop; /* initialize variables to measure elapsed time */
-    /* measure elapsed time */
-    // printf("RTT (milliseconds): %f\n", (float)(stop.tv_usec - start.tv_usec)/1000);
-    /* section 3 - END */
 
     /* close socket */
     close(sock_fd);
