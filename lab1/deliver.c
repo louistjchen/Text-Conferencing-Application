@@ -11,7 +11,7 @@
 #include <math.h>
 
 // timeout 50us
-#define T1 15
+#define T1 500
 
 /* DEFINE BEGIN - struct packet */
 typedef struct packet {
@@ -190,12 +190,13 @@ int main(int argc, char * argv[]) {
     char outgoing_packet_str[1100]; /* string to capture outgoing packets */
     char incoming_ack_str[1000]; /* string to capture incoming acks */
     packet incoming_ack;
-    struct timeval start, stop;
+    struct timeval start, stop, timetaken;
     while (curr < num_packets) {
         /* initialize outgoing packet str */
         bzero(outgoing_packet_str,sizeof(outgoing_packet_str));
         bzero(incoming_ack_str,sizeof(incoming_ack_str));
-        format_string(outgoing_packet_str,outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
+	// wrap FINISH packet
+	format_string(outgoing_packet_str,outgoing_packet[curr].total_frag,outgoing_packet[curr].frag_no,outgoing_packet[curr].size,outgoing_packet[curr].filename,outgoing_packet[curr].filedata);
         int ack_flag = 0;
         do {
             /* send the packet once */
@@ -203,12 +204,14 @@ int main(int argc, char * argv[]) {
             printf("Send packet\n");
             sendto(sock_fd,outgoing_packet_str,sizeof(outgoing_packet_str),0,(struct sockaddr *) &server_addr_info,server_len);
             /* check for incoming ack/nack */
-            printf("Wait on ack \n");
+            printf("Wait on ack for packet %u\n", curr+1);
             int recv_success = recvfrom(sock_fd,incoming_ack_str,sizeof(incoming_ack_str),0,(struct sockaddr *) &server_addr_info,&server_len);
             gettimeofday(&stop, NULL); /* stop time */
-	        if((stop.tv_usec - start.tv_usec) > T1)
-		        printf("Acknowledgement wait time (%dus) exceeds defined timeout %dus. Resending packet\n", (stop.tv_usec - start.tv_usec), T1);
-            if (recv_success >= 0 && ((stop.tv_usec - start.tv_usec) <= T1)) {
+	    timetaken.tv_usec = stop.tv_usec - start.tv_usec;
+            if(timetaken.tv_usec > T1)
+		        printf("Acknowledgement wait time (%dus) exceeds defined timeout %dus. Resending packet\n", timetaken.tv_usec, T1);
+            if (recv_success >= 0 && (timetaken.tv_usec <= T1)) {
+		printf("RTT for packet %u: %uus\n", curr+1, timetaken.tv_usec);
                 printf("Received ack from server\n");
                 decipher_packet(&incoming_ack,incoming_ack_str);
                 if (incoming_ack.frag_no == curr + 1 && incoming_ack.size == 3) {
@@ -219,6 +222,12 @@ int main(int argc, char * argv[]) {
             bzero(&incoming_ack_str,sizeof(incoming_ack_str));
         } while (!ack_flag);        
     }
+
+    strcpy(outgoing_packet_str, "__FINISH__\0");
+    int send_success = -1;
+    while(send_success < 0)
+	    send_success = sendto(sock_fd,outgoing_packet_str,sizeof(outgoing_packet_str),0,(struct sockaddr *) &server_addr_info,server_len);
+    printf("Client sent %s\n", outgoing_packet_str);
 
     /* close socket */
     close(sock_fd);
