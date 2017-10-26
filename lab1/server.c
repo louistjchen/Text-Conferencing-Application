@@ -126,13 +126,20 @@ int main(int argc, char * argv[]) {
     bool malloc2d = false;
     bool *malloced = NULL;
 
-    while (curr < num_packets) {
+    while (curr < num_packets + 1) {
         /* reset incoming packet str */
 		bzero(incoming_packet_str, sizeof(incoming_packet_str));
         /* check for incoming packets */
         int recv_success = recvfrom(sock_fd,incoming_packet_str,sizeof(incoming_packet_str),0,(struct sockaddr *) &anyclient_addr_info,&anyclient_len);
 	    if (recv_success >= 0) {
             printf("Received packet from client\n");
+            //if(curr == num_packets)
+            //    printf("%s\n", incoming_packet_str);
+            /* close server connection if receive FIN */
+            if (strcmp(incoming_packet_str, "__FINISH__") == 0) {
+                printf("Server received FIN packet\n");
+                break;
+            }
             decipher_packet(&incoming_packet,incoming_packet_str);
             /* if receiving packet for the first time, must update num_packets */
             if (!malloc2d && incoming_packet.frag_no == 1) { 
@@ -161,9 +168,12 @@ int main(int argc, char * argv[]) {
             }
             copy_string(file_data[curr],incoming_packet.filedata,incoming_packet.size);
             /* incoming packet is the one server is waiting for */
-            if (incoming_packet.frag_no == curr + 1) {
+            if (curr == incoming_packet.frag_no - 1) {
                 sprintf(outgoing_ack_str,"%u:%u:3:%s:ack\0",incoming_packet.total_frag,incoming_packet.frag_no,incoming_packet.filename);
                 curr++;
+            } else if (curr == incoming_packet.frag_no) {
+            /* incoming packet is one that the server already accepted previously */
+                sprintf(outgoing_ack_str,"%u:%u:3:%s:ack\0",incoming_packet.total_frag,incoming_packet.frag_no,incoming_packet.filename);
             }
             
         } else {
@@ -171,7 +181,7 @@ int main(int argc, char * argv[]) {
         }
         /* send ack/nack */
         sendto(sock_fd,outgoing_ack_str,sizeof(outgoing_ack_str),0,(struct sockaddr *) &anyclient_addr_info,anyclient_len);
-        printf("Server sent ack/nack\n");
+        printf("Server sent ack/nack for packet %u\n",curr+1);
     }
 
     /* write filedata to file stream */
