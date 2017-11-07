@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <stdlib.b>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -35,11 +35,11 @@ struct lab3message {
 
 int main (int argc, char *argv[]) {
 
-	char *command = NULL;
-	char *clientID = NULL;
-	char *clientPW = NULL;
-	char *serverIP = NULL;
-	char *serverPN = NULL;
+	char command[100];
+	char clientID[100];
+	char clientPW[100];
+	char serverIP[100];
+	char serverPN[100];
 
 
 	/* prompt user to login */
@@ -50,12 +50,8 @@ int main (int argc, char *argv[]) {
 		scanf("%s", &clientPW);
 		scanf("%s", &serverIP);
 		scanf("%s", &serverPN);
-	} while( strcmp(command, "/login") == 0
-			&& clientID != NULL
-			&& clientPW != NULL
-			&& serverIP != NULL
-			&& serverPN != NULL);
-	
+	} while(strcmp(command, "/login") != 0);
+
 
 	/* check if entered server is valid; if so then connect */
 	int sockfd = -1;
@@ -77,7 +73,8 @@ int main (int argc, char *argv[]) {
 	bcopy( (char*) server->h_addr, (char*) &serveraddr.sin_addr.s_addr, server->h_length );
 	serveraddr.sin_port = htons(portnum);
 
-	if( connect(sockfd, &serveraddr, sizeof(serveraddr)) < 0 ) {
+	int connect_success = connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr));
+	if(connect_success < 0) {
 		printf("ERROR: Server connection fails.\n");
 		return -1;
 	}
@@ -85,11 +82,18 @@ int main (int argc, char *argv[]) {
 		printf("Connected to server.\n");
 
 
+	/* send & receive */
+	int send_success = -1;
+	while(send_success < 0)
+		send_success = write(sockfd, "hi from client", strlen("hi frmo client"));
+	char buf[MAX_DATA];
+	bzero(buf, MAX_DATA);
+	int recv_success = -1;
+	while(recv_success < 0)
+		recv_success = read(sockfd, buf, MAX_DATA);
+
+	printf("Echo from server: %s\n", buf);
 
 
-	
-
-
-	
 	return 0;
 }
