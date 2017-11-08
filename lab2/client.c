@@ -47,8 +47,9 @@ int main (int argc, char *argv[]) {
 initial_stage:
 
 	/* prompt user to login */
+	printf("*** Welcome to the Conference Room ***\n");
 	do{
-		printf("Please enter command: ");
+		printf("Please login: ");
 		scanf("%s", command);
 		scanf("%s", clientID);
 		scanf("%s", clientPW);
@@ -124,6 +125,7 @@ initial_stage:
 
 	/* prompt user to input command */
 	char sessionID[64];
+	char sessionScan[64];
 	char scan[MAX_DATA];
 	char text[MAX_DATA];
 	bool clientInSession = false;
@@ -134,8 +136,9 @@ initial_stage:
 
 		/* /login			prompt user that he/she is already logged in 	*/
 		if( strcmp(command, "/login") == 0 ) {
-			printf("User \"%s\" is currently logged in.\n");
+			printf("User \"%s\" is currently logged in.\n", clientID);
 			printf("Please logout before attempting new login.\n");
+			while( getchar() != '\n' );
 		}
 
 		/* /logout			exit the server and reprompt for login		*/
@@ -155,16 +158,16 @@ initial_stage:
 
 		/* /joinsession <session ID>	join session with given session id		*/
 		else if( strcmp(command, "/joinsession") == 0 ) {
-			scanf("%s", sessionID);
+			scanf("%s", sessionScan);
 			if(clientInSession) {
-				printf("ERROR: User is already in session %s.\n", sessionID);
+				printf("ERROR: User \"%s\" is already in session %s.\n", clientID, sessionID);
 			}
 			else {
 				bzero((char *)&packet, sizeof(packet));
 				packet.type = JOIN;
 				packet.size = PACKET_SIZE;
 				strncpy(packet.source, clientID, MAX_NAME);
-				strncpy(packet.data, sessionID, MAX_DATA);
+				strncpy(packet.data, sessionScan, MAX_DATA);
 
 				if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
 					printf("ERROR: JOIN send fails.\n");
@@ -179,6 +182,9 @@ initial_stage:
 				if(packet.type == JN_ACK) {
 					printf("JOIN is acknowledged.\n");
 					clientInSession = true;
+					strncpy(sessionID, packet.data, strlen(packet.data));
+					sessionID[strlen(packet.data)] = '\0';
+					printf("User \"%s\" has successfully joined session \"%s\".\n", clientID, sessionID);
 				}
 				else if(packet.type == JN_NAK) {
 					printf("ERROR: JOIN is not acknowledged.\n");
@@ -205,24 +211,25 @@ initial_stage:
 				}
 				clientInSession = false;
 				printf("User \"%s\" successfully left session \"%s\".\n", clientID, sessionID);
+				sessionID[0] = '\0';
 			}
 			else {
-				printf("ERROR: User is not in a session yet.\n");
+				printf("ERROR: User \"%s\" is not in a session yet.\n", clientID);
 			}
 		}
 
 		/* /createsession <session ID>	create a new conference session and join it	*/
 		else if( strcmp(command, "/createsession") == 0 ) {
-			scanf("%s", sessionID);
+			scanf("%s", sessionScan);
 			if(clientInSession) {
-				printf("ERROR: User is already in session %s.\n", sessionID);
+				printf("ERROR: User \"%s\" is already in session \"%s\".\n", clientID, sessionID);
 			}
 			else {
 				bzero((char *)&packet, sizeof(packet));
 				packet.type = NEW_SESS;
 				packet.size = PACKET_SIZE;
 				strncpy(packet.source, clientID, MAX_NAME);
-				strncpy(packet.data, sessionID, MAX_DATA);
+				strncpy(packet.data, sessionScan, MAX_DATA);
 
 				if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
 					printf("ERROR: NEW_SESS send fails.\n");
@@ -236,37 +243,13 @@ initial_stage:
 
 				if(packet.type == NS_ACK) {
 					printf("NEW_SESS is acknowledged.\n");
-
-					bzero((char *)&packet, sizeof(packet));
-					packet.type = JOIN;
-					packet.size = PACKET_SIZE;
-					strncpy(packet.source, clientID, MAX_NAME);
-					strncpy(packet.data, sessionID, MAX_DATA);
-	
-					if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
-						printf("ERROR: JOIN send fails.\n");
-						return -1;
-					}
-					bzero((char *)&packet, sizeof(packet));
-					if( recv(sockfd, &packet, sizeof(packet), 0) < 0 ) {
-						printf("ERROR: JOIN recv fails.\n");
-						return -1;
-					}
-	
-					if(packet.type == JN_ACK) {
-						printf("JOIN is acknowledged.\n");
-						clientInSession = true;
-					}
-					else if(packet.type == JN_NAK) {
-						printf("ERROR: JOIN is not acknowledged.\n");
-						printf("Reason: %s\n", packet.data);
-					}
-					else {
-						printf("ERROR: JOIN unknown status \"%u\"is returned\n", packet.type);
-					}
+					clientInSession = true;
+					strncpy(sessionID, packet.data, strlen(packet.data));
+					sessionID[strlen(packet.data)] = '\0';
+					printf("User \"%s\" has successfully joined session \"%s\".\n", clientID, sessionID);
 				}
 				else {
-					printf("ERROR: NEW_SESS unknown status \"%u\"is returned.\n", packet.type);
+					printf("ERROR: NEW_SESS unknown status \"%u\" is returned.\n", packet.type);
 				}
 			}
 		}
@@ -312,6 +295,7 @@ initial_stage:
 				}
 				clientInSession = false;
 				printf("User \"%s\" successfully left session \"%s\".\n", clientID, sessionID);
+				sessionID[0] = '\0';
 			}
 
 			bzero((char *)&packet, sizeof(packet)); // safe logout
@@ -352,7 +336,7 @@ initial_stage:
 				printf("Message \"%s\" is successfully sent to session \"%s\".\n", packet.data, sessionID);
 			}
 			else {
-				printf("ERROR: User is not in a session yet.\n");
+				printf("ERROR: User \"%s\" is not in a session yet.\n", clientID);
 			}
 		}
 
