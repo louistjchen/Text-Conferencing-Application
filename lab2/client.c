@@ -1,3 +1,11 @@
+/*
+ * 	ECE361 - Text Conferencing Lab
+ *
+ * 	Louis Chen		1000303502
+ * 	Chia-Hang Chang		1000611260
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -256,6 +264,7 @@ initial_stage:
 		}
 
 		/* /list			list of connected clients & available sessions	*/
+		/*				print broadcasted messages from session if any	*/
 		else if( strcmp(command, "/list") == 0 ) {
 			bzero((char *)&packet, sizeof(packet));
 			packet.type = QUERY;
@@ -274,7 +283,8 @@ initial_stage:
 
 			if(clientInSession) { // handle any incoming message if in a session
 				while(packet.type == MESSAGE) {
-					printf("Message from session \"%s\": %s\n", sessionID, packet.data);
+					printf("\tMessage broadcasted by \"%s\" from session \"%s\" is as follows.\n", packet.source, sessionID);
+					printf("\t\t%s\n", packet.data);
 					if( recv(sockfd, &packet, sizeof(packet), 0) < 0 ) {
 						printf("ERROR: QUERY - MESSAGE recv fails.\n");
 						return -1;

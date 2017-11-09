@@ -1,3 +1,11 @@
+/*
+ * 	ECE361 - Text Conferencing Lab
+ *
+ * 	Louis Chen		1000303502
+ * 	Chia-Hang Chang		1000611260
+ *
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -84,7 +92,7 @@ broadcast:
     if (found_match) {
         printf("Client %s is in session ID \"%s\", broadcast to all other clients in this session\n", outgoing_msg->source, session_list[i]->session_id);
         for (j = 0; j < MAX_NUM_CLIENTS; j++) {
-            int tmp_fd = session_list[i]->connected_client_fds[i];
+            int tmp_fd = session_list[i]->connected_client_fds[j];
             if (tmp_fd > -1 && tmp_fd != client_fd) {
                 if (send(tmp_fd, outgoing_msg, sizeof(*outgoing_msg),0) == -1) {
                     fprintf(stderr,"Send() failed\n");
