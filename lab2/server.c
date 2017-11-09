@@ -43,6 +43,7 @@
 #define QUERY       111
 #define QU_ACK      112
 
+
 /* DEFINE BEGIN - message structure */
 typedef struct lab3message {
     unsigned int type;
