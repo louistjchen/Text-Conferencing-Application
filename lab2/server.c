@@ -56,6 +56,7 @@ bool is_client_connected[MAX_NUM_CLIENTS] = {false};
 // /* DEFINE BEGIN - list of session IDs and corresponding info */
 typedef struct session {
     char            session_id[MAX_SESSION_ID_LEN];
+    int             num_connected_clients;
     int             connected_client_fds[MAX_NUM_CLIENTS];
     bool            connected_client_status[MAX_NUM_CLIENTS];
     char*           connected_client_ip_addr[MAX_NUM_CLIENTS];
@@ -64,6 +65,29 @@ typedef struct session {
 
 session* session_list[MAX_NUM_CLIENTS] = {NULL}; // at most 1 session per client
 // /* DEFINE END - list of session IDs and corresponding info */
+
+/* FUNCTION BEGIN - broadcast to all connected clients */
+
+/* FUNCTION END - broadcast to all connected clients */
+
+/* FUNCTION BEGIN - print sessions and clients */
+void print_sessions_and_clients(lab3message* outgoing_msg) {
+    int i, j;
+    for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+        sprintf(outgoing_msg->data,"\tSession ID:");
+        if (session_list[i] != NULL) {
+            sprintf(outgoing_msg->data,"%s\n",session_list[i]->session_id);
+            for (j = 0; j < MAX_NUM_CLIENTS; j++) {
+                sprintf(outgoing_msg->data,"\t\tClient ID:");    
+                if (session_list[i]->connected_client_status[j] == true) {
+                    sprintf(outgoing_msg->data,"%s\n",client_list[j]);
+                }
+            }
+        }
+    }
+    return;
+}
+/* FUNCTION END - print sessions and clients */
 
 /* FUNCTION BEGIN - check that session exists */
 bool is_session_valid(char* session_id) {
@@ -98,11 +122,18 @@ void leave_session_by_fd(int client_fd) {
 found:
     if (found_match) {
         printf("Client %s has left session ID \"%s\"\n",client_list[j],session_list[i]->session_id);
+        session_list[i]->num_connected_clients--;
         session_list[i]->connected_client_fds[j] = -1;
         session_list[i]->connected_client_status[j] = false;
         if (session_list[i]->connected_client_ip_addr[j] != NULL) {
             free(session_list[i]->connected_client_ip_addr[j]);
             session_list[i]->connected_client_ip_addr[j] = NULL;
+        }
+        // if no more connected clients, kill the session
+        if (session_list[i]->num_connected_clients == 0) {
+            printf("No more clients connected to session ID \"%s\", killing the session\n",session_list[i]->session_id);
+            free(session_list[i]);
+            session_list[i] = NULL;
         }
     }
     return;
@@ -124,6 +155,7 @@ void join_session(int currfd, char* client_id, char* session_id, char* client_ip
     for (i = 0; i < MAX_NUM_CLIENTS; i++) {
         // found match
         if (strcmp(session_list[i]->session_id,session_id) == 0) {
+            session_list[i]->num_connected_clients++;
             session_list[i]->connected_client_fds[index] = currfd;
             session_list[i]->connected_client_status[index] = true;
             if (session_list[i]->connected_client_ip_addr[index] == NULL) {
@@ -165,6 +197,7 @@ bool create_session(char* client_id, char* session_id, unsigned short client_por
         session_list[first_null_index]->session_id[strlen(session_id)] = '\0';
         int j;
         for (j = 0; j < MAX_NUM_CLIENTS; j++) {
+            session_list[first_null_index]->num_connected_clients = 0;
             session_list[first_null_index]->connected_client_fds[j] = -1;
             session_list[first_null_index]->connected_client_status[j] = false;
             session_list[first_null_index]->connected_client_ip_addr[j] = NULL;
@@ -269,6 +302,8 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
     bool login_result = true;
     // set to true if session to create already exists
     bool session_exists = false;
+    // tmp counters
+    int i, j;
     // check incoming msg type
     switch(incoming_msg->type) {
         case LOGIN:
@@ -319,7 +354,6 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
             break;
         case LEAVE_SESS:
             // free client entry from session
-            printf("Client about to leave session\n");
             leave_session_by_fd(clientfds[fd_index]);
             break;
         case NEW_SESS:
@@ -336,11 +370,32 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
             break; 
         case MESSAGE:
             // broadcast message to all other clients in same session
-            printf("Client about to broadcast message\n");
+            outgoing_msg->type = MESSAGE;
+            strncpy(outgoing_msg->data,incoming_msg->data,strlen(incoming_msg->data));
+            outgoing_msg->data[strlen(incoming_msg->data)] = '\0';
+            // broadcast_to_all_connected_clients(clientfds[fd_index],outgoing_msg);
             break;
         case QUERY:
             // output list of connected clients and sessions
             printf("Client about to query for connected clients and sessions\n");
+            outgoing_msg->type = QU_ACK;
+            for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+                if (session_list[i] != NULL) {
+                    strcat(outgoing_msg->data, "\tSession ID: ");
+                    strcat(outgoing_msg->data, session_list[i]->session_id);
+                    strcat(outgoing_msg->data, "\n");
+                    for (j = 0; j < MAX_NUM_CLIENTS; j++) {
+                        if (session_list[i]->connected_client_status[j] == true) {
+                            strcat(outgoing_msg->data, "\t\tClient ID: ");
+                            strcat(outgoing_msg->data, client_list[j]);
+                            strcat(outgoing_msg->data, "\n");
+                        }
+                    }
+                }
+            }
+            if (strlen(outgoing_msg->data) == 0) {
+                strcat(outgoing_msg->data,"\tNo active sessions\n");
+            }
             break;
         default:
             // not sure
@@ -440,10 +495,11 @@ int main(int argc, char **argv) {
                 if (fd_state == 0 && fd_error == 0) {
                     FD_SET(currfd, &readfds);
                 } else {
-                    // disconnect client by fd index
                     printf("Hard disconnect socket %d\n", currfd);
-                    disconnect_client_by_fd_index(j);
+                    // remove client from its active session
                     leave_session_by_fd(currfd);
+                    // disconnect client by fd index
+                    disconnect_client_by_fd_index(j);
                     close(currfd);
                     clientfds[j] = -1;
                 }
@@ -497,9 +553,10 @@ int main(int argc, char **argv) {
                     } else {
                         fprintf(stderr,"Recv() failed\n");
                     }
+                    // remove client from its active session 
+                    leave_session_by_fd(currfd);
                     // disconnect client by fd index
                     disconnect_client_by_fd_index(j);
-                    leave_session_by_fd(currfd);
                     close(currfd);
                     clientfds[j] = -1;
                 // got data from client
@@ -520,14 +577,18 @@ int main(int argc, char **argv) {
                     }
                     // need to perform proper exit on client socket or login failure
                     if (!login_success || incoming_msg.type == EXIT) {
-                        printf("Entered exit\n");
-                        disconnect_client_by_fd_index(j);
-                        close(currfd);
-                        clientfds[j] = -1;
+                        printf("Entered !login_success or exit\n");
                         if (incoming_msg.type == EXIT) {
                             leave_session_by_fd(currfd);
                             printf("Client %s has logged out\n",incoming_msg.source);
                         }
+                        disconnect_client_by_fd_index(j);
+                        close(currfd);
+                        clientfds[j] = -1;
+                    }
+                    if (incoming_msg.type == LEAVE_SESS) {
+                        printf("Entered leave_sess\n");
+                        leave_session_by_fd(currfd);
                     }
                     
                 }
