@@ -126,11 +126,12 @@ initial_stage:
 	/* prompt user to input command */
 	char sessionID[64];
 	char sessionScan[64];
-	char scan[MAX_DATA];
 	char text[MAX_DATA];
 	bool clientInSession = false;
 	while(1) {
-	
+
+		/* poll for potential input message with timeout */
+
 		printf("Please enter command: ");
 		scanf("%s", command);
 
@@ -271,12 +272,22 @@ initial_stage:
 				return -1;
 			}
 
+			if(clientInSession) { // handle any incoming message if in a session
+				while(packet.type == MESSAGE) {
+					printf("Message from session \"%s\": %s\n", sessionID, packet.data);
+					if( recv(sockfd, &packet, sizeof(packet), 0) < 0 ) {
+						printf("ERROR: QUERY - MESSAGE recv fails.\n");
+						return -1;
+					}
+				}
+			}
+
 			if(packet.type == QU_ACK) {
 				printf("QUERY is acknowledged.\n");
-				printf("List: %s", packet.data);
+				printf("List of available sessions and in-session users: \n%s", packet.data);
 			}
 			else {
-				printf("ERROR: QUERY unknown status is returned.\n");
+				printf("ERROR: QUERY unknown status \"%u\" is returned.\n", packet.type);
 			}
 		}
 
@@ -319,12 +330,22 @@ initial_stage:
 			packet.size = PACKET_SIZE;
 			strncpy(packet.source, clientID, MAX_NAME);
 
-			if( strlen(command) < MAX_DATA ) // concatenate the first word in message (scanned by command)
+			bzero((char *)text, MAX_DATA);
+			if( strlen(command) < MAX_DATA ) { // concatenate the first word in message (scanned by command)
 				strcat(text, command);
-			while( getchar() != '\n' ) { // scan the entire message before \n
-				scanf("%s", scan);
-				if( (strlen(text) + strlen(scan)) < MAX_DATA )
-					strcat(text, scan);
+				text[strlen(command)] = '\0';
+			}
+			char c = getchar();
+			while( c != '\n' ) { // scan the entire message before \n
+				int len = strlen(text);
+				if( (len + 1) < MAX_DATA ) {
+					text[len] = c;
+					text[len+1] = '\0';
+					c = getchar();
+				}
+				else {
+					break;
+				}
 			}
 			strncpy(packet.data, text, MAX_DATA);
 
@@ -337,6 +358,7 @@ initial_stage:
 			}
 			else {
 				printf("ERROR: User \"%s\" is not in a session yet.\n", clientID);
+				printf("       Cannot print message: \"%s\"\n", packet.data);
 			}
 		}
 
