@@ -67,7 +67,35 @@ session* session_list[MAX_NUM_CLIENTS] = {NULL}; // at most 1 session per client
 // /* DEFINE END - list of session IDs and corresponding info */
 
 /* FUNCTION BEGIN - broadcast to all connected clients */
-
+void broadcast_to_all_connected_clients(int client_fd, lab3message* outgoing_msg) {
+    int i, j;
+    bool found_match = false;
+    for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+        if (session_list[i] != NULL) {
+            for (j = 0; j < MAX_NUM_CLIENTS; j++) {
+                if (session_list[i]->connected_client_fds[j] == client_fd) {
+                    found_match = true;
+                    goto broadcast;
+                }
+            }
+        }
+    }
+broadcast:
+    if (found_match) {
+        printf("Client %s is in session ID \"%s\", broadcast to all other clients in this session\n", outgoing_msg->source, session_list[i]->session_id);
+        for (j = 0; j < MAX_NUM_CLIENTS; j++) {
+            int tmp_fd = session_list[i]->connected_client_fds[i];
+            if (tmp_fd > -1 && tmp_fd != client_fd) {
+                if (send(tmp_fd, outgoing_msg, sizeof(*outgoing_msg),0) == -1) {
+                    fprintf(stderr,"Send() failed\n");
+                }
+            } 
+        }
+    } else {
+        printf("Client %s is not in a session, do nothing\n", outgoing_msg->source);
+    }
+    return;
+}
 /* FUNCTION END - broadcast to all connected clients */
 
 /* FUNCTION BEGIN - print sessions and clients */
@@ -373,7 +401,7 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
             outgoing_msg->type = MESSAGE;
             strncpy(outgoing_msg->data,incoming_msg->data,strlen(incoming_msg->data));
             outgoing_msg->data[strlen(incoming_msg->data)] = '\0';
-            // broadcast_to_all_connected_clients(clientfds[fd_index],outgoing_msg);
+            broadcast_to_all_connected_clients(clientfds[fd_index],outgoing_msg);
             break;
         case QUERY:
             // output list of connected clients and sessions
