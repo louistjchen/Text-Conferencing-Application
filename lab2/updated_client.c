@@ -17,22 +17,26 @@
 #include <netdb.h>
 
 /* some macros */
-#define MAX_NAME	1024
-#define MAX_DATA	1024
-#define PACKET_SIZE	2056
-#define LOGIN		100
-#define LO_ACK		101
-#define LO_NAK		102
-#define EXIT		103
-#define JOIN		104
-#define JN_ACK		105
-#define JN_NAK		106
-#define LEAVE_SESS	107
-#define NEW_SESS	108
-#define NS_ACK		109
-#define MESSAGE		110
-#define QUERY		111
-#define QU_ACK		112
+#define MAX_NAME	    1024
+#define MAX_DATA	    1024
+#define PACKET_SIZE	    2056
+#define LOGIN		    100
+#define LO_ACK		    101
+#define LO_NAK		    102
+#define EXIT		    103
+#define JOIN		    104
+#define JN_ACK		    105
+#define JN_NAK		    106
+#define LEAVE_SESS	    107
+#define NEW_SESS	    108
+#define NS_ACK		    109
+#define MESSAGE		    110
+#define QUERY		    111
+#define QU_ACK		    112
+#define INVITE          113
+#define INVITE_NOTIFY   114
+#define INVITE_ACK      115
+#define INVITE_NAK      116
 
 #define STDIN       0
 
@@ -65,7 +69,7 @@ int main (int argc, char *argv[]) {
 	// prompt user to input command
 	char sessionID[64];
 	char sessionScan[64];
-	char text[MAX_DATA];
+    char clientScan[64];
     bool clientConnected = false;
 	bool clientInSession = false;
 
@@ -119,7 +123,7 @@ int main (int argc, char *argv[]) {
                 
                 // check if client already in session
                 if (clientInSession) {
-                    fprintf(stderr,"Client already in session, please log out before attempting new login\n");
+                    fprintf(stderr,"Client already in session, log out before attempting new login\n");
                     continue;
                 }
 
@@ -221,7 +225,7 @@ int main (int argc, char *argv[]) {
 
                 // check that client is actually logged in
                 if (!clientConnected) {
-                    fprintf(stderr,"Please log in with a valid client first\n");
+                    fprintf(stderr,"Log in with valid client name and password first\n");
                     continue;
                 }
 
@@ -253,7 +257,7 @@ int main (int argc, char *argv[]) {
                 
                 // check if client already in session
                 if (clientInSession) {
-                    fprintf(stderr,"Client already in session, please log out before creating new session\n");
+                    fprintf(stderr,"Client already in session, log out before creating new session\n");
                     continue;
                 }
 
@@ -300,7 +304,7 @@ int main (int argc, char *argv[]) {
                 }
             }
             // leave session
-            else if (strstr(inputBuffer, "leavesession") != NULL) {
+            else if (strstr(inputBuffer, "/leavesession") != NULL) {
                 if (!clientInSession) {
                     fprintf(stderr,"Client \"%s\" is not in any active session yet, cannot leave a session\n", clientID);
                     continue;
@@ -325,7 +329,7 @@ int main (int argc, char *argv[]) {
                 clientInSession = false;
             }
             // list
-            else if (strstr(inputBuffer, "list") != NULL) {
+            else if (strstr(inputBuffer, "/list") != NULL) {
                 
                 // send packet to server
                 struct lab3message packet; 
@@ -340,7 +344,7 @@ int main (int argc, char *argv[]) {
                 }
             }
             // quit (first leave session, if in active session, then log out
-            else if (strstr(inputBuffer, "quit") != NULL) {
+            else if (strstr(inputBuffer, "/quit") != NULL) {
                 
                 struct lab3message leave_packet, logout_packet;
                 // check if client is even connected
@@ -402,6 +406,56 @@ logout:
                 break;
             
             }
+            // new functionality: invite other clients to join session
+            else if (strstr(inputBuffer, "/invite") != NULL) {
+                
+                // check if client is connected
+                if (!clientConnected) {
+                    fprintf(stderr, "No established connection, log in with valid client name and password in order to invite other clients\n");
+                    continue;
+                }
+
+                // check if client in active session
+                if (!clientInSession) {
+                    fprintf(stderr,"Client \"%s\" is not in any active session, join or create a session in order to invite other clients\n", clientID);
+                    continue;
+                }
+
+                // split string
+                // get the first token
+                char *token = strtok(inputBuffer, " ");
+                int count = 0;
+
+                while (token != NULL) {
+                    if (count == 1) {
+                        strncpy(clientScan, token, strlen(token));
+                        clientScan[strlen(token)] = '\0';
+                    }
+                    count++;
+                    token = strtok(NULL, " ");
+                }
+                // check that all required input arguments are passed in
+                if (count < 1) {
+                    memset(clientScan, 0, 64);
+                    fprintf(stderr,"Invite failed, missing arguments\n"); 
+                }
+
+                // send packet to server
+                struct lab3message packet;
+                packet.type = INVITE;
+                packet.size = PACKET_SIZE;
+
+                strncpy(packet.source, clientID, strlen(clientID));
+                packet.source[strlen(clientID)] = '\0';
+                strncpy(packet.data, clientScan, strlen(clientScan));
+                packet.data[strlen(clientScan)] = '\0';
+                
+                if ( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
+                    fprintf(stderr, "Invite send failed\n");
+                    continue;
+                }
+
+            }
             // write message
             else {
                 
@@ -437,6 +491,7 @@ logout:
         // if something happend on sockfd, it is an incoming packet from the server
         if (FD_ISSET(sockfd, &readfds)) {
             struct lab3message packet;
+            memset(&packet, 0, sizeof(packet));
 	        if( recv(sockfd, &packet, sizeof(packet), 0) < 0 ) {
 	        	fprintf(stderr,"Recv() failed\n");
 	        	continue;
@@ -478,6 +533,25 @@ logout:
                 printf("Query is acknowledged\n");
                 printf("List of available sessions and in-session clients: \n%s", packet.data);
             }
+            // invite ack
+            else if (packet.type == INVITE_ACK) {
+                printf("Invite is acknowledged\n");
+                printf("Client \"%s\" has successfully invited client \"%s\" into session \"%s\"\n", clientID, packet.source, packet.data);
+            }
+            // invite nak
+            else if (packet.type == INVITE_NAK) {
+                fprintf(stderr, "Invite is not acknowledged\n");
+                fprintf(stderr, "Reason: %s\n", packet.data);
+            }
+            // invite notify
+            else if (packet.type == INVITE_NOTIFY) {
+                printf("Invite notify is acknowledged\n");
+                printf("Client \"%s\" has switched to session \"%s\"\n", clientID, packet.data);
+                clientInSession = true;
+                memset(sessionID, 0, 64);
+                strncpy(sessionID, packet.data, strlen(packet.data));
+                sessionID[strlen(packet.data)] = '\0';
+            }
             // incoming message
             else if (packet.type == MESSAGE) {
                 if (!clientInSession) {
@@ -490,82 +564,6 @@ logout:
         
         }
  
-		// /* poll for potential input message with timeout */
-
-		// printf("Please enter command: ");
-		// scanf("%s", command);
-
-		// /* /quit			safe logout and terminate the program		*/
-		// else if( strcmp(command, "/quit") == 0 ) {
-		// 	if(clientInSession) { // leave the session if connected to one
-		// 		bzero((char *)&packet, sizeof(packet));
-		// 		packet.type = LEAVE_SESS;
-		// 		packet.size = PACKET_SIZE;
-		// 		strncpy(packet.source, clientID, MAX_NAME);
-		// 		strncpy(packet.data, sessionID, MAX_DATA);
-		// 		
-		// 		if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
-		// 			printf("ERROR: LEAVE_SESS send fails.\n");
-		// 			return -1;
-		// 		}
-		// 		clientInSession = false;
-		// 		printf("User \"%s\" successfully left session \"%s\".\n", clientID, sessionID);
-		// 		sessionID[0] = '\0';
-		// 	}
-
-		// 	bzero((char *)&packet, sizeof(packet)); // safe logout
-		// 	packet.type = EXIT;
-		// 	packet.size = PACKET_SIZE;
-		// 	strncpy(packet.source, clientID, MAX_NAME);
-
-		// 	if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
-		// 		printf("ERROR: LOGOUT send fails.\n");
-		// 		return -1;
-		// 	}
-		// 	printf("User \"%s\" is successfully logged out.\n", clientID);
-
-		// 	break;
-		// }
-
-		// /* <text>			send a message to current conference session	*/
-		// else {
-		// 	bzero((char *)&packet, sizeof(packet));
-		// 	packet.type = MESSAGE;
-		// 	packet.size = PACKET_SIZE;
-		// 	strncpy(packet.source, clientID, MAX_NAME);
-
-		// 	bzero((char *)text, MAX_DATA);
-		// 	if( strlen(command) < MAX_DATA ) { // concatenate the first word in message (scanned by command)
-		// 		strcat(text, command);
-		// 		text[strlen(command)] = '\0';
-		// 	}
-		// 	char c = getchar();
-		// 	while( c != '\n' ) { // scan the entire message before \n
-		// 		int len = strlen(text);
-		// 		if( (len + 1) < MAX_DATA ) {
-		// 			text[len] = c;
-		// 			text[len+1] = '\0';
-		// 			c = getchar();
-		// 		}
-		// 		else {
-		// 			break;
-		// 		}
-		// 	}
-		// 	strncpy(packet.data, text, MAX_DATA);
-
-		// 	if(clientInSession) { // send the message if client is in a session
-		// 		if( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
-		// 			printf("ERROR: MESSAGE send fails.\n");
-		// 			return -1;
-		// 		}
-		// 		printf("Message \"%s\" is successfully sent to session \"%s\".\n", packet.data, sessionID);
-		// 	}
-		// 	else {
-		// 		printf("ERROR: User \"%s\" is not in a session yet.\n", clientID);
-		// 		printf("       Cannot print message: \"%s\"\n", packet.data);
-		// 	}
-		// }
-
 	}
 
 	printf("Program terminated.\n");
