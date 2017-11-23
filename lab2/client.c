@@ -33,10 +33,12 @@
 #define MESSAGE		    110
 #define QUERY		    111
 #define QU_ACK		    112
-#define INVITE          113
-#define INVITE_NOTIFY   114
-#define INVITE_ACK      115
-#define INVITE_NAK      116
+#define INVITE              113
+#define INVITE_NOTIFY       114
+#define INVITE_ACCEPT	    115
+#define INVITE_REJECT	    116
+#define INVITE_ACK          117
+#define INVITE_NAK          118
 
 #define STDIN       0
 
@@ -51,11 +53,11 @@ struct lab3message {
 
 int main (int argc, char *argv[]) {
 
-	char command[64];
-	char clientID[64];
-	char clientPW[64];
-	char serverIP[64];
-	char serverPN[64];
+   char command[64];
+   char clientID[64];
+   char clientPW[64];
+   char serverIP[64];
+   char serverPN[64];
 
     int sockfd = -1;
     int portnum = -1;
@@ -66,12 +68,16 @@ int main (int argc, char *argv[]) {
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
 
-	// prompt user to input command
-	char sessionID[64];
-	char sessionScan[64];
+    // prompt user to input command
+    char sessionID[64];
+    char sessionScan[64];
     char clientScan[64];
+    char inviteSessionID[64];
+    char inviteClientID[64];
     bool clientConnected = false;
-	bool clientInSession = false;
+    bool clientInSession = false;
+    bool clientInvited = false;
+
 
     char inputBuffer[MAX_DATA];
     fd_set readfds;
@@ -116,7 +122,8 @@ int main (int argc, char *argv[]) {
                 inputBuffer[inputLen] = '\0';
             }
 
-            printf("\"%s\" was read from stdin.\n",inputBuffer);
+	    // print message for debugging, when stdin contains some message
+            //printf("\"%s\" was read from stdin.\n",inputBuffer);
 
             // login
             if (strstr(inputBuffer,"/login") != NULL) {
@@ -458,6 +465,70 @@ logout:
                 }
 
             }
+	    // new functionality: accept invitation request from other clients
+	    else if (strstr(inputBuffer, "/accept") != NULL) {
+	    
+		    // check if client has received invitation request
+		    if(!clientInvited) {
+		    	fprintf(stderr, "No invitation request is received, invalid accept\n");
+			continue;
+		    }
+		    // if client is invited
+		    else {
+
+			// send packet to server
+			struct lab3message packet;
+			packet.type = INVITE_ACCEPT;
+			packet.size = PACKET_SIZE;
+         		strncpy(packet.source, clientID, strlen(clientID));
+	                packet.source[strlen(clientID)] = '\0';
+        	        strncpy(packet.data, inviteClientID, strlen(inviteClientID));
+	                packet.data[strlen(inviteClientID)] = '\0';
+
+     		        if ( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
+        		    fprintf(stderr," invitation accept failed\n");
+               		    continue;
+               		}
+
+			// print accept message, and update sessionID
+		    	printf("Client \"%s\" accepted invitation request from client \"%s\" to join session \"%s\"\n", clientID, inviteClientID, inviteSessionID);
+	                clientInvited = false;
+	                clientInSession = true;
+	                memset(sessionID, 0, 64);
+	                strncpy(sessionID, inviteSessionID, strlen(inviteSessionID));
+	                sessionID[strlen(inviteSessionID)] = '\0';
+		    }
+	    }
+	    // new functionality: reject invitation request from other clients
+	    else if (strstr(inputBuffer, "/reject") != NULL) {
+	    
+		    // check if client has received invitation request
+		    if(!clientInvited) {
+		    	fprintf(stderr, "No invitation request is received, invalid reject\n");
+			continue;
+		    }
+		    // if client is invited
+		    else {
+		    
+			// send packet to server
+			struct lab3message packet;
+			packet.type = INVITE_REJECT;
+			packet.size = PACKET_SIZE;
+         		strncpy(packet.source, clientID, strlen(clientID));
+	                packet.source[strlen(clientID)] = '\0';
+      	        	strncpy(packet.data, inviteClientID, strlen(inviteClientID));
+	                packet.data[strlen(inviteClientID)] = '\0';
+
+			if ( send(sockfd, &packet, sizeof(packet), 0) < 0 ) {
+        		    fprintf(stderr," invitation reject failed\n");
+               		    continue;
+               		}
+
+			// print reject message, but don't update sessionID
+		    	printf("Client \"%s\" rejected invitation request from client \"%s\" to join session \"%s\"\n", clientID, inviteClientID, inviteSessionID);
+	                clientInvited = false;
+		    }
+	    }
             // write message
             else {
                 
@@ -547,12 +618,22 @@ logout:
             }
             // invite notify
             else if (packet.type == INVITE_NOTIFY) {
-                printf("Invite notify is acknowledged\n");
-                printf("Client \"%s\" has switched to session \"%s\"\n", clientID, packet.data);
-                clientInSession = true;
-                memset(sessionID, 0, 64);
-                strncpy(sessionID, packet.data, strlen(packet.data));
-                sessionID[strlen(packet.data)] = '\0';
+                printf("Invitation request is received\n");
+		printf("Please /accept or /reject\n");
+                
+		// buffer invitee's clientID and sessionID
+                clientInvited = true;
+		memset(inviteClientID, 0, 64);
+		strncpy(inviteClientID, packet.source, strlen(packet.source));
+		inviteClientID[strlen(packet.source)] = '\0';
+		memset(inviteSessionID, 0, 64);
+		strncpy(inviteSessionID, packet.data, strlen(packet.data));
+		inviteSessionID[strlen(packet.data)] = '\0';
+
+//                clientInSession = true;
+//                memset(sessionID, 0, 64);
+//                strncpy(sessionID, packet.data, strlen(packet.data));
+//                sessionID[strlen(packet.data)] = '\0';
             }
             // incoming message
             else if (packet.type == MESSAGE) {
