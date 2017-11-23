@@ -120,6 +120,10 @@ int switch_session(char* client_id, char* dest_session_id) {
         for (i = 0; i < MAX_NUM_CLIENTS; i++) {
             if (session_list[i] != NULL) {
                 if (session_list[i]->connected_client_status[client_index] == true) {
+                    if (i == dest_session_index) {
+                        fprintf(stderr,"Client %s is already in session \"%s\", cannot invite into same session\n", client_id, session_list[i]->session_id);
+                        return 0;
+                    }
                     printf("Client %s switched session from session \"%s\" to session \"%s\"\n", client_id, session_list[i]->session_id, session_list[dest_session_index]->session_id);
                     // copy all info from src session to dest session
                     session_list[dest_session_index]->connected_client_fds[client_index] = session_list[i]->connected_client_fds[client_index];
@@ -586,6 +590,8 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
             }
 
             // find which session the invited client is currently in, and switch to the inviting client's session
+            // if returned value is -1, the invited client does not have a valid fd
+            // if returned value is 0, the invited client is already in the same session as inviting client, send INVITE_NAK back to inviting client
             invited_client_fd = switch_session(incoming_msg->data, dest_session_id);
 
             // kill any empty sessions
@@ -593,7 +599,24 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
 
             // send two packets, one to invited client, one to inviting client
             if (invited_client_fd != -1) {
-                // send to inviting client first
+
+                // send NAK to inviting client
+                if (invited_client_fd == 0) {
+                    outgoing_msg->type = INVITE_NAK;
+                    memset(outgoing_msg->source, 0, sizeof(outgoing_msg->source));
+                    strncpy(outgoing_msg->source, incoming_msg->data, strlen(incoming_msg->data));
+                    outgoing_msg->source[strlen(incoming_msg->data)] = '\0';
+                    // copy error msg into outgoing_msg data
+                    snprintf(outgoing_msg->data,MAX_DATA,"client %s is already in session \"%s\", cannot invite into same session\n",outgoing_msg->source,dest_session_id);
+                    if (send(clientfds[fd_index], outgoing_msg, sizeof(*outgoing_msg), 0) < 0) {
+                        fprintf(stderr,"Send() to inviting client failed\n");
+                        break;
+                    }
+                
+                    break;
+                }
+
+                // send ACK to inviting client
                 outgoing_msg->type = INVITE_ACK;
                 // copy invited client ID into outgoing_msg source
                 memset(outgoing_msg->source, 0, sizeof(outgoing_msg->source));
