@@ -442,6 +442,13 @@ bool is_client_id_valid(char* client_id) {
 /* FUNCTION BEGIN - disconnect client by fd index */
 void disconnect_client_by_fd_index(int fd_index) {
     if (fd_index_to_client_id_map[fd_index] != NULL) {
+        int i;
+        for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+            if (strcmp(client_list[i],fd_index_to_client_id_map[fd_index]) == 0) {
+                is_client_logged_in[i] = false;
+                break;
+            }
+        }
         free(fd_index_to_client_id_map[fd_index]);
         fd_index_to_client_id_map[fd_index] = NULL;
     }
@@ -459,6 +466,14 @@ void disconnect_client_by_fd_index(int fd_index) {
 /* FUNCTION BEGIN - map fd index to client ID */
 void map_fd_index_to_client_id(int fd_index, char* client_id, char* client_ip_addr) {
     assert(fd_index_to_client_id_map[fd_index] == NULL);
+    // set is_client_logged_in entry to true
+    int i;
+    for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+        if (strcmp(client_list[i],client_id) == 0) {
+            is_client_logged_in[i] = true;
+            break;
+        }
+    }
     // dynamically allocate memory for client ID
     int len = strlen(client_id);
     fd_index_to_client_id_map[fd_index] = (char *) malloc( sizeof(char) * (len+1)); // +1 for terminating NULL
@@ -549,11 +564,6 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
                 break;
             }
             // everything works up til now
-            for (i = 0; i < MAX_NUM_CLIENTS; i++) {
-                if (strcmp(client_list[i],incoming_msg->data) == 0) {
-                    is_client_logged_in[i] = true;
-                }
-            }
             map_fd_index_to_client_id(fd_index,incoming_msg->source,client_ip_addr);
             outgoing_msg->type = LO_ACK;
             printf("Client %s logged in successfully\n",incoming_msg->source);

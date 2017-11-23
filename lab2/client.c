@@ -42,7 +42,7 @@
 
 #define STDIN       0
 
-/* protocol structture */
+/* protocol structure */
 struct lab3message {
 	unsigned int type;
 	unsigned int size;
@@ -69,11 +69,11 @@ int main (int argc, char *argv[]) {
     serveraddr.sin_family = AF_INET;
 
     // prompt user to input command
-    char sessionID[64];
-    char sessionScan[64];
-    char clientScan[64];
-    char inviteSessionID[64];
-    char inviteClientID[64];
+    char sessionID[64] = {0};
+    char sessionScan[64] = {0};
+    char clientScan[64] = {0};
+    char inviteSessionID[64] = {0};
+    char inviteClientID[64] = {0};
     bool clientConnected = false;
     bool clientInSession = false;
     bool clientInvited = false;
@@ -128,9 +128,9 @@ int main (int argc, char *argv[]) {
             // login
             if (strstr(inputBuffer,"/login") != NULL) {
                 
-                // check if client already in session
-                if (clientInSession) {
-                    fprintf(stderr,"Client already in session, log out before attempting new login\n");
+                // check if client already logged in
+                if (clientConnected) {
+                    fprintf(stderr,"Client already logged in, log out before attempting new login\n");
                     continue;
                 }
 
