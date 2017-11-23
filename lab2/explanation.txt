@@ -1,0 +1,28 @@
+#ECE361 Computer Networks - Lab 2: Text Conferencing Lab
+#Section 2: This text file explains the additional functionality we implemented, which is unique to our program.
+
+#Louis Chen         1000303502
+#Chia-Hang Chang    1000611260
+
+We enabled any client currently in an active session to be able to invite other clients; the invited clients do not have 
+to be in an active session, but they only need to be logged in. We achieved this by adding a few more packet types, as 
+well as a few more commands to be recognized by the client and server. When a client first makes an invite request, it 
+sends an INVITE packet to the server, and the server will send an INVITE_NOTIFY packet to the invited client (it was able 
+to determine the invited client from the INVITE packet's data). The invited packet will then be able to type "/accept" or 
+"reject", which triggers a corresponding INVITE_ACCEPT or INVITE_REFUSE packet to be sent back to the server. The server, 
+upon receiving the invited client's response, will then send a corresponding INVITE_ACK or INVITE_NAK to the original 
+inviting client. 
+
+Note that this invite functionality could be much more easily implemented if the inviting client directly sends a packet 
+to the invited client. However, the multicast functionality requested in Section 1 of the lab could also have been better 
+implemented via a peer-to-peer architecture, but the lab specifically asked us to implement a client-server architecture. 
+Therefore, we assumedthat we had to maintain the client-server architecture for Section 2, thus sending all packets to the 
+server first. 
+
+Here are some of the corner cases we tested, as well as the corresponding response in our program:
+1. Invited client is invalid (not a recognized client): server will send an INVITE_NAK packet to the client, explaining 
+that the client is invalid
+2. Invited client is not yet logged in: server will send an INVITE_NAK packet to the client, saying that the client is 
+not yet logged in
+3. Client invites itself: server will send an INVITE_NAK packet to the client, explaining that the client cannot invite 
+a client in the same session
