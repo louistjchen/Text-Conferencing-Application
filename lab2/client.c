@@ -248,6 +248,7 @@ int main (int argc, char *argv[]) {
 
                 // close socket
                 close(sockfd);
+                clientInSession = false;
                 clientConnected = false;
                 
             }
@@ -401,6 +402,7 @@ logout:
                
                 // closet socket
                 close(sockfd);
+                clientInSession = false;
                 clientConnected = false; 
 
                 break;
