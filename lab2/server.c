@@ -44,8 +44,10 @@
 #define QU_ACK          112
 #define INVITE          113
 #define INVITE_NOTIFY   114
-#define INVITE_ACK      115
-#define INVITE_NAK      116
+#define INVITE_ACCEPT   115
+#define INVITE_REJECT   116
+#define INVITE_ACK      117
+#define INVITE_NAK      118
 
 
 /* DEFINE BEGIN - message structure */
@@ -67,18 +69,20 @@ char* fd_index_to_client_ip_addr_map[MAX_NUM_CLIENTS] = {NULL};
 bool is_fd_connected[MAX_NUM_CLIENTS] = {false};
 /* DEFINE END - global info */
 
-// /* DEFINE BEGIN - list of session IDs and corresponding info */
+/* DEFINE BEGIN - list of session IDs and corresponding info */
 typedef struct session {
     char            session_id[MAX_SESSION_ID_LEN];
     int             num_connected_clients;
-    int             connected_client_fds[MAX_NUM_CLIENTS];
+    int             connected_client_fds[MAX_NUM_CLIENTS]; // used to map client fd to client id
     bool            connected_client_status[MAX_NUM_CLIENTS];
     char*           connected_client_ip_addr[MAX_NUM_CLIENTS];
     unsigned int    connected_client_port_no[MAX_NUM_CLIENTS];
 } session;
 
 session* session_list[MAX_NUM_CLIENTS] = {NULL}; // at most 1 session per client
-// /* DEFINE END - list of session IDs and corresponding info */
+/* DEFINE END - list of session IDs and corresponding info */
+
+
 
 /* FUNCTION BEGIN - switch client to given session */
 int switch_session(char* client_id, char* dest_session_id) {
@@ -162,6 +166,8 @@ int switch_session(char* client_id, char* dest_session_id) {
 } 
 /* FUNCTION END - switch client to given session */
 
+
+
 /* FUNCTION BEGIN - broadcast to all connected clients */
 void broadcast_to_all_connected_clients(int client_fd, lab3message* outgoing_msg) {
     int i, j;
@@ -194,6 +200,8 @@ broadcast:
 }
 /* FUNCTION END - broadcast to all connected clients */
 
+
+
 /* FUNCTION BEGIN - print sessions and clients */
 void print_sessions_and_clients(lab3message* outgoing_msg) {
     int i, j;
@@ -212,6 +220,8 @@ void print_sessions_and_clients(lab3message* outgoing_msg) {
     return;
 }
 /* FUNCTION END - print sessions and clients */
+
+
 
 /* FUNCTION BEGIN - check that client is in a session */
 void find_client_session(char* client_id, char* session_id) {
@@ -239,6 +249,8 @@ void find_client_session(char* client_id, char* session_id) {
 }
 /* FUNCTION END - check that client is in a session */
 
+
+
 /* FUNCTION BEGIN - check that session exists */
 bool is_session_valid(char* session_id) {
     int i;
@@ -254,6 +266,8 @@ bool is_session_valid(char* session_id) {
     return found_match;
 }
 /* FUNCTION END - check that session exists */
+
+
 
 /* FUNCTION BEGIN - leave session by client fd */
 void leave_session_by_fd(int client_fd) {
@@ -290,6 +304,8 @@ found:
 }
 /* FUNCTION END - leave session by client fd */
 
+
+
 /* FUNCTION BEGIN - kill any empty sessions */
 void kill_empty_sessions() {
     int i;
@@ -305,6 +321,8 @@ void kill_empty_sessions() {
     return;
 }
 /* FUNCTION END - kill any empty sessions */
+
+
 
 /* FUNCTION BEGIN - join session */
 void join_session(int currfd, char* client_id, char* session_id, char* client_ip_addr, unsigned short client_port_no) {
@@ -374,6 +392,8 @@ bool create_session(char* client_id, char* session_id, unsigned short client_por
 }
 /* FUNCTION END - create session */
 
+
+
 /* FUNCTION BEGIN - check connecting client is not logging in with taken client ID */
 // return true if taken, else return false
 bool check_client_connected(int fd_index) {
@@ -385,6 +405,8 @@ bool check_client_connected(int fd_index) {
     return false;
 }
 /* FUNCTION END - check connecting client is not logging in with taken client ID */
+
+
 
 /* FUNCTION BEGIN - check that client ID is valid */
 bool is_client_id_valid(char* client_id) {
@@ -656,6 +678,8 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
     return login_result;
 }
 /* FUNCTION END - handle different packets */
+
+
 
 int main(int argc, char **argv) {
 
