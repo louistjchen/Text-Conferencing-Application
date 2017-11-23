@@ -67,6 +67,7 @@ int clientfds[MAX_NUM_CLIENTS]; // initialize in main()
 char* fd_index_to_client_id_map[MAX_NUM_CLIENTS] = {NULL};
 char* fd_index_to_client_ip_addr_map[MAX_NUM_CLIENTS] = {NULL};
 bool is_fd_connected[MAX_NUM_CLIENTS] = {false};
+bool is_client_logged_in[MAX_NUM_CLIENTS] = {false};
 /* DEFINE END - global info */
 
 /* DEFINE BEGIN - list of session IDs and corresponding info */
@@ -139,6 +140,7 @@ bool switch_session(char* client_id, char* dest_session_id) {
                     session_list[i]->connected_client_fds[client_index] = -1;
                     session_list[i]->connected_client_status[client_index] = false;
                     free(session_list[i]->connected_client_ip_addr[client_index]);
+                    session_list[i]->connected_client_ip_addr[client_index] = NULL;
                     // increment dest session connected clients count
                     session_list[dest_session_index]->num_connected_clients++;
                     // decrement src session connected clients count
@@ -359,7 +361,7 @@ void join_session(int currfd, char* client_id, char* session_id, char* client_ip
 
 
 /* FUNCTION BEGIN - create session */
-bool create_session(char* client_id, char* session_id, unsigned short client_port_no) {
+void create_session(char* client_id, char* session_id, unsigned short client_port_no) {
     int i;
     int first_null_index = MAX_NUM_CLIENTS;
     bool found_match = false;
@@ -389,15 +391,15 @@ bool create_session(char* client_id, char* session_id, unsigned short client_por
             session_list[first_null_index]->connected_client_port_no[j] = client_port_no;
         }
     }
-    return found_match;
+    return;
 }
 /* FUNCTION END - create session */
 
 
 
-/* FUNCTION BEGIN - check connecting client is not logging in with taken client ID */
-// return true if taken, else return false
-bool check_client_connected_by_fd_index(int fd_index) {
+/* FUNCTION BEGIN - check if client is logged in by fd index */
+// return true if logged in, else return false
+bool check_client_logged_in_by_fd_index(int fd_index) {
     if (clientfds[fd_index] > -1 && fd_index_to_client_id_map[fd_index] != NULL) {
         if (is_fd_connected[fd_index] == true) {
             return true;
@@ -406,6 +408,20 @@ bool check_client_connected_by_fd_index(int fd_index) {
     return false;
 }
 /* FUNCTION END - check connecting client is not logging in with taken client ID */
+
+
+
+/* FUNCTION BEGIN - check if client is logged in by client ID */
+// return true if logged in, else return false
+bool check_client_logged_in(char* client_id) {
+    int i;
+    for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+        if (strcmp(client_list[i],client_id) == 0) {
+            return is_client_logged_in[i];
+        }
+    }
+}
+/* FUNCTION END - check if client is already logged in */
 
 
 
@@ -517,7 +533,7 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
                 break;
             }
             // check that connecting client is not logging in with taken client ID
-            if (check_client_connected_by_fd_index(fd_index) == true) {
+            if (check_client_logged_in(incoming_msg->source) == true) {
                 outgoing_msg->type = LO_NAK;
                 snprintf(outgoing_msg->data,MAX_DATA,"client ID %s is already taken",incoming_msg->source);
                 fprintf(stderr,"Client ID %s is already taken\n",incoming_msg->source);
@@ -533,6 +549,11 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
                 break;
             }
             // everything works up til now
+            for (i = 0; i < MAX_NUM_CLIENTS; i++) {
+                if (strcmp(client_list[i],incoming_msg->data) == 0) {
+                    is_client_logged_in[i] = true;
+                }
+            }
             map_fd_index_to_client_id(fd_index,incoming_msg->source,client_ip_addr);
             outgoing_msg->type = LO_ACK;
             printf("Client %s logged in successfully\n",incoming_msg->source);
@@ -558,8 +579,8 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
             leave_session_by_fd(clientfds[fd_index]);
             break;
         case NEW_SESS:
-            // create new session, and add client entry to session; if session already exists, join existing session
-            session_exists = create_session(incoming_msg->source,incoming_msg->data,client_port_no);
+            // create new session, or do nothing if session exists; join the session
+            create_session(incoming_msg->source,incoming_msg->data,client_port_no);
             join_session(clientfds[fd_index],incoming_msg->source,incoming_msg->data,client_ip_addr,client_port_no);
             outgoing_msg->type = NS_ACK;
             strncpy(outgoing_msg->data,incoming_msg->data,strlen(incoming_msg->data));
@@ -659,8 +680,8 @@ bool handle_msg(int fd_index, lab3message* incoming_msg, lab3message* outgoing_m
                 break;
             }
 
-            // check that invited client is connected
-            if (check_client_connected_by_fd_index(invited_client_fd_index) == false) {
+            // check that invited client is logged in 
+            if (check_client_logged_in_by_fd_index(invited_client_fd_index) == false) {
                 fprintf(stderr,"Invited client %s is not connected\n", incoming_msg->data);
                 outgoing_msg->type = INVITE_NAK;
                 snprintf(outgoing_msg->data,MAX_DATA,"invited client %s is not connected",incoming_msg->data);
